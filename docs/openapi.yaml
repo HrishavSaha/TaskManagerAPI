@@ -1,0 +1,469 @@
+openapi: 3.0.3
+
+info:
+  title: Task Management API
+  description: An API that manages user-generated tasks for a productivity management app
+  version: 1.0.0
+
+security:
+  - BearerAuth: []
+
+servers:
+  - url: http://localhost:8080/v1
+    description: Local development server
+
+paths:
+  /tasks:
+    get:
+      summary: List authenticated user's tasks
+      description: Retrieves tasks belonging to the authenticated user. Supports pagination, status filtering, and sorting.
+      operationId: listTasks
+      tags:
+        - Task
+      parameters:
+        - name: page
+          in: query
+          description: Page number, starting from 1
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          example: 1
+          
+        - name: limit
+          in: query
+          description: Maximum number of tasks per page
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          example: 20
+          
+        - name: status
+          in: query
+          description: Filter tasks by their status
+          required: false
+          schema:
+            type: string
+            enum:
+              - open
+              - in_progress
+              - completed
+          example: open
+
+        - name: sortBy
+          in: query
+          description: Field used to sort the results
+          required: false
+          schema:
+            type: string
+            enum:
+              - status
+              - dueDate
+              - createdAt
+            default: createdAt
+          example: createdAt
+
+        - name: sortOrder
+          in: query
+          description: Sort direction
+          required: false
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+            default: desc
+          example: desc
+
+      responses:
+        '200':
+          description: Tasks retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Task'
+                  pagination:
+                    type: object
+                    properties:
+                      page:
+                        type: integer
+                        example: 1
+                      limit:
+                        type: integer
+                        example: 20
+                      total:
+                        type: integer
+                        description: Total matching tasks across all pages
+                        example: 47
+                      totalPages:
+                        type: integer
+                        example: 3
+                      hasNextPage:
+                        type: boolean
+                        example: true
+                      hasPreviousPage:
+                        type: boolean
+                        example: false
+                    required:
+                      - page
+                      - limit
+                      - total
+                      - totalPages
+                      - hasNextPage
+                      - hasPreviousPage
+                required:
+                  - data
+                  - pagination
+        
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        
+        '500': 
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      summary: Create a task
+      description: Creates a task for the authenticated user. The task owner is derived from the authenticated identity.
+      operationId: createTask
+      tags:
+        - Task
+      
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTaskRequest'
+
+      responses:
+        '201':
+          description: Task created successfully
+          headers:
+            Location:
+              description: Relative URI of the newly created task
+              schema:
+                type: string
+                example: /v1/tasks/550e8400-e29b-41d4-a716-446655440000
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        
+        '400': 
+          $ref: '#/components/responses/BadRequestError'
+        
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        
+        '422':
+          $ref: '#/components/responses/UnprocessableEntityError'
+        
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /tasks/{taskId}:
+    get:
+      summary: Get a task by id
+      description: Retrieves a specific task belonging to the authenticated user
+      operationId: getTaskById
+      tags:
+        - Task
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          description: UUID of the task to retrieve
+          schema:
+            type: string
+            format: uuid
+      
+      responses:
+        '200':
+          description: Task retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    patch:
+      summary: Update a task's status
+      description: Updates the status of a task belonging to the authenticated user. No other task fields can be modified through this endpoint.
+      operationId: updateTaskStatus
+      tags:
+        - Task
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          description: UUID of the task to update
+          schema:
+            type: string
+            format: uuid
+      
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTaskRequest'
+      
+      responses:
+        '200':
+          description: Task status updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+          
+        '422':
+          $ref: '#/components/responses/UnprocessableEntityError'
+
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      summary: Delete a task
+      description: Deletes a task belonging to the authenticated user
+      operationId: deleteTask
+      tags:
+        - Task
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          description: UUID of the task to delete
+          schema:
+            type: string
+            format: uuid
+      
+      responses:
+        '204':
+          description: Task deleted successfully
+
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    UnauthorizedError:
+      description: Access token is missing or invalid.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Unauthorized Access
+            required:
+              - error
+            
+    InternalServerError:
+      description: Unexpected server error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Internal server error
+            required:
+              - error
+
+    BadRequestError:
+      description: The request is malformed or contains invalid parameters
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Invalid request
+            required:
+              - error
+
+    UnprocessableEntityError:
+      description: Request fields failed validation
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Validation failed
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    field:
+                      type: string
+                      example: title
+                    message:
+                      type: string
+                      example: Title must be at least 1 character long
+                  required:
+                    - field
+                    - message
+            required:
+              - error
+              - details
+
+    NotFoundError:
+      description: Task not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: Task not found
+            required:
+              - error
+
+  schemas:
+    CreateTaskRequest:
+      type: object
+      description: Fields accepted when creating a task
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 120
+          example: "Buy groceries"
+        description:
+          type: string
+          maxLength: 2000
+          example: "Need to get milk and eggs from market"
+        status:
+          type: string
+          enum:
+            - open
+            - in_progress
+            - completed
+          example: open
+        dueDate:
+          type: string
+          format: date
+          example: "2026-10-13"
+      required:
+        - title
+        - status
+      additionalProperties: false
+    
+    UpdateTaskRequest:
+      type: object
+      description: Fields that can be modified on an existing task
+      properties:
+        status:
+          type: string
+          enum:
+            - open
+            - in_progress
+            - completed
+          example: completed
+      required:
+        - status
+      additionalProperties: false
+    
+    Task:
+      type: object
+      description: A task belonging to an authenticated user
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        ownerId:
+          type: string
+          format: uuid
+          example: "a3f1c2d4-5678-4abc-9def-1234567890ab"
+        title:
+          type: string
+          minLength: 1
+          maxLength: 120
+          example: "Buy groceries"
+        description:
+          type: string
+          maxLength: 2000
+          nullable: true
+          example: "Need to get milk and eggs from market"
+        status:
+          type: string
+          enum:
+            - open
+            - in_progress
+            - completed
+          example: open
+        dueDate:
+          type: string
+          format: date
+          nullable: true
+          example: "2026-10-13"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-10-13T08:30:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2026-10-20T08:30:00Z"
+      required:
+        - id
+        - ownerId
+        - title
+        - description
+        - status
+        - dueDate
+        - createdAt
+        - updatedAt
+      additionalProperties: false
+			
