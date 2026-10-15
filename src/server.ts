@@ -3,6 +3,7 @@ import express, { type Request, type Response, type NextFunction } from "express
 import { pool } from "./config/database.js";
 
 import { getTasks } from "./features/tasks/task.repository.js";
+import { validateGetTasksQuery } from "./features/tasks/task.validation.js";
 
 const app = express();
 
@@ -32,12 +33,32 @@ app.get('/health/db', async (_req, res) => {
 	}
 });
 
-app.get('/v1/tasks', async (_req, res) => {
+app.get('/v1/tasks', async (req, res) => {
+	const validation = validateGetTasksQuery(req);
+
+	if (!validation.success) {
+		res.status(400).json({
+			error: {
+				code: "BAD_REQUEST",
+				message: validation.message,
+			}
+		});
+		return;
+	}
+
+	const ownerId = "11111111-1111-4111-8111-111111111111";
+
 	try {
-		const tasks = await getTasks();
+		const { tasks, totalItems } = await getTasks({ ...validation.data, ownerId });
 
 		res.status(200).json({
-			data: tasks
+			data: tasks,
+			pagination: {
+				page: validation.data.page,
+				limit: validation.data.limit,
+				total: totalItems,
+				totalPages: Math.ceil(totalItems / validation.data.limit),
+			}
 		});
 	} catch (error) {
 		console.error("Failed to fetch tasks:", error);
