@@ -1,5 +1,7 @@
 import { pool } from "../../config/database.js";
 
+import type { CreateTaskInput } from "./task-create.validation.js";
+
 export type TaskStatus = "open" | "in_progress" | "completed";
 export type TaskSortField = "status" | "dueDate" | "createdAt";
 export type SortOrder = "asc" | "desc";
@@ -70,4 +72,25 @@ export async function getTasks(options: GetTasksOptions) {
 		tasks: readResult.rows,
 		totalItems: Number(countResult.rows[0].total),
 	}
+}
+
+export async function createTask(ownerId: string, input: CreateTaskInput) {
+	const insertSql = `
+		INSERT INTO tasks (owner_id, title, description, status, due_date)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING
+			id,
+			owner_id as "ownerId",
+			title,
+			description,
+			status,
+			due_date as "dueDate",
+			created_at as "createdAt",
+			updated_at as "updatedAt"
+	`
+	const values = [ownerId, input.title, input.description ?? null, input.status, input.dueDate ?? null];
+
+	const insertResult = await pool.query(insertSql, values);
+
+	return insertResult.rows[0];
 }
