@@ -94,3 +94,26 @@ export async function createTask(ownerId: string, input: CreateTaskInput) {
 
 	return insertResult.rows[0];
 }
+
+export async function getTaskById(taskId: string, ownerId: string) {
+	const readSql = `
+		SELECT
+			id,
+			owner_id as "ownerId",
+			title,
+			description,
+			status,
+			due_date,
+			created_at as "createdAt",
+			updated_at as "updatedAt"
+		FROM tasks
+		WHERE id = $1 AND owner_id = $2
+		LIMIT 1
+	`
+
+	const values = [taskId, ownerId];
+
+	const readResult = await pool.query(readSql, values);
+
+	return readResult.rows[0] ?? null;
+}

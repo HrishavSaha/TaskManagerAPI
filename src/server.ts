@@ -8,6 +8,9 @@ import { validateGetTasksQuery } from "./features/tasks/task.validation.js";
 import { createTask } from "./features/tasks/task.repository.js";
 import { validateCreateTaskBody } from "./features/tasks/task-create.validation.js";
 
+import { getTaskById } from "./features/tasks/task.repository.js";
+import { isValidUUID } from "./features/tasks/task-id.validation.js";
+
 const app = express();
 
 app.use(express.json());
@@ -103,6 +106,49 @@ app.post('/v1/tasks', async (req, res) => {
 			error: {
 				code: "INTERNAL_SERVER_ERROR",
 				message: "An unexpected error occurred.",
+			},
+		});
+	}
+})
+
+app.get('/v1/tasks/:taskId', async (req, res) => {
+	const { taskId } = req.params;
+
+	if (!isValidUUID(taskId)) {
+		res.status(400).json({
+			error: {
+				code: "BAD_REQUEST",
+				message: "taskId must be a valid UUID",
+			},
+		});
+		return;
+	}
+
+	const ownerId = "11111111-1111-4111-8111-111111111111";
+
+	try {
+		const task = await getTaskById(taskId, ownerId);
+
+		if (!task) {
+			res.status(404).json({
+				error: {
+					code: "NOT_FOUND",
+					message: "Task not found.",
+				},
+			});
+			return;
+		}
+
+		res.status(200).json({
+			data: task,
+		});
+	} catch (error) {
+		console.log("Failed to fetch task:", error);
+
+		res.status(500).json({
+			error: {
+				code: "INTERNAL_SERVER_ERROR",
+				message: "An unexpected error occurred",
 			},
 		});
 	}
