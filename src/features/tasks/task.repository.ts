@@ -117,3 +117,26 @@ export async function getTaskById(taskId: string, ownerId: string) {
 
 	return readResult.rows[0] ?? null;
 }
+
+export async function updateTaskStatus(taskId: string, ownerId: string, status: TaskStatus) {
+	const updateSql = `
+		UPDATE tasks
+		SET status = $1, updated_at = NOW()
+		WHERE id = $2 AND owner_id = $3
+		RETURNING
+			id,
+			owner_id as "ownerId",
+			title,
+			description,
+			status,
+			due_date as "dueDate",
+			created_at as "createdAt",
+			updated_at as "updatedAt"
+	`
+
+	const values = [status, taskId, ownerId];
+
+	const updateResult = await pool.query(updateSql, values);
+
+	return updateResult.rows[0] ?? null;
+}
