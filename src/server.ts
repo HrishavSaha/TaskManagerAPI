@@ -14,6 +14,8 @@ import { isValidUUID } from "./features/tasks/task-id.validation.js";
 import { updateTaskStatus } from "./features/tasks/task.repository.js";
 import { validateUpdateTaskBody } from "./features/tasks/task-update.validation.js";
 
+import { deleteTask } from "./features/tasks/task.repository.js";
+
 const app = express();
 
 app.use(express.json());
@@ -202,6 +204,47 @@ app.patch('/v1/tasks/:taskId', async (req, res) => {
 		});
 	} catch (error) {
 		console.error("Failed to update task:", error);
+
+		res.status(500).json({
+			error: {
+				code: "INTERNAL_SERVER_ERROR",
+				message: "An unexpected error occurred",
+			},
+		});
+	}
+})
+
+app.delete('/v1/tasks/:taskId', async (req, res) => {
+	const { taskId } = req.params;
+
+	if (!isValidUUID(taskId)) {
+		res.status(400).json({
+			error: {
+				code: "BAD_REQUEST",
+				message: "taskId must be a valid UUID",
+			},
+		});
+		return;
+	}
+
+	const ownerId = "11111111-1111-4111-8111-111111111111";
+
+	try {
+		const deleted = await deleteTask(taskId, ownerId);
+
+		if (!deleted) {
+			res.status(404).json({
+				error: {
+					code: "NOT_FOUND",
+					message: "Task not found.",
+				},
+			});
+			return;
+		}
+
+		res.status(204).send();
+	} catch (error) {
+		console.error("Failed to delete task:", error);
 
 		res.status(500).json({
 			error: {

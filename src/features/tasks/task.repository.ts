@@ -140,3 +140,17 @@ export async function updateTaskStatus(taskId: string, ownerId: string, status: 
 
 	return updateResult.rows[0] ?? null;
 }
+
+export async function deleteTask(taskId: string, ownerId: string) {
+	const deleteSql = `
+		DELETE FROM tasks
+		WHERE id = $1 AND owner_id = $2
+		RETURNING id
+	`
+
+	const values = [taskId, ownerId];
+
+	const deleteResult = await pool.query(deleteSql, values);
+
+	return (deleteResult.rowCount ?? 0) > 0;
+}
