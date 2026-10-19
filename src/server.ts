@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express, { type Request, type Response, type NextFunction } from "express";
+import bcrypt from "bcryptjs";
 import { pool } from "./config/database.js";
 
 import { getTasks } from "./features/tasks/task.repository.js";
@@ -15,6 +16,9 @@ import { updateTaskStatus } from "./features/tasks/task.repository.js";
 import { validateUpdateTaskBody } from "./features/tasks/task-update.validation.js";
 
 import { deleteTask } from "./features/tasks/task.repository.js";
+
+import { createUser } from "./features/auth/auth.repository.js";
+import { validateRegisterBody } from "./features/auth/auth.validation.js";
 
 const app = express();
 
@@ -250,6 +254,50 @@ app.delete('/v1/tasks/:taskId', async (req, res) => {
 			error: {
 				code: "INTERNAL_SERVER_ERROR",
 				message: "An unexpected error occurred",
+			},
+		});
+	}
+})
+
+app.post('/v1/auth/register', async (req, res) => {
+	const validation = validateRegisterBody(req);
+
+	if (!validation.success) {
+		res.status(422).json({
+			error: {
+				code: "UNPROCESSABLE_ENITY",
+				message: validation.message,
+			},
+		});
+		return;
+	}
+
+	try {
+		const { email, username, password } = validation.data;
+
+		const passwordHash = await bcrypt.hash(password, 12);
+
+		const user = await createUser(email, username, passwordHash);
+
+		res.status(201).json({
+			data: user,
+		});
+	} catch (error) {
+		if (typeof error === "object" && error !== null && "code" in error && error.code === "23505") {
+			res.status(409).json({
+				error: {
+					code: "CONFLICT",
+					message: "Email or username is already registered.",
+				},
+			});
+		}
+
+		console.error("Registration failed:", error);
+
+		res.status(500).json({
+			error: {
+				code: "INTERNAL_SERVER_ERROR",
+				message: "An unexpected error occurred.",
 			},
 		});
 	}
