@@ -3,6 +3,7 @@ import express, { type Request, type Response, type NextFunction } from "express
 import bcrypt from "bcryptjs";
 import { pool } from "./config/database.js";
 import { createAccessToken } from "./features/auth/auth.token.js";
+import { requireAuth } from "./features/auth/auth.middleware.js";
 
 import { getTasks } from "./features/tasks/task.repository.js";
 import { validateGetTasksQuery } from "./features/tasks/task.validation.js";
@@ -52,7 +53,7 @@ app.get('/health/db', async (_req, res) => {
 	}
 });
 
-app.get('/v1/tasks', async (req, res) => {
+app.get('/v1/tasks', requireAuth, async (req, res) => {
 	const validation = validateGetTasksQuery(req);
 
 	if (!validation.success) {
@@ -65,7 +66,7 @@ app.get('/v1/tasks', async (req, res) => {
 		return;
 	}
 
-	const ownerId = "11111111-1111-4111-8111-111111111111";
+	const ownerId = req.user!.id;
 
 	try {
 		const { tasks, totalItems } = await getTasks({ ...validation.data, ownerId });
@@ -91,7 +92,7 @@ app.get('/v1/tasks', async (req, res) => {
 	}
 });
 
-app.post('/v1/tasks', async (req, res) => {
+app.post('/v1/tasks', requireAuth, async (req, res) => {
 	const validation = validateCreateTaskBody(req);
 
 	if (!validation.success) {
@@ -104,7 +105,7 @@ app.post('/v1/tasks', async (req, res) => {
 		return;
 	}
 
-	const ownerId = "11111111-1111-4111-8111-111111111111";
+	const ownerId = req.user!.id;
 	
 	try {
 		const task = await createTask(ownerId, validation.data);
@@ -124,10 +125,10 @@ app.post('/v1/tasks', async (req, res) => {
 	}
 })
 
-app.get('/v1/tasks/:taskId', async (req, res) => {
+app.get('/v1/tasks/:taskId', requireAuth, async (req, res) => {
 	const { taskId } = req.params;
 
-	if (!isValidUUID(taskId)) {
+	if (typeof taskId !== "string" || !isValidUUID(taskId)) {
 		res.status(400).json({
 			error: {
 				code: "BAD_REQUEST",
@@ -137,7 +138,7 @@ app.get('/v1/tasks/:taskId', async (req, res) => {
 		return;
 	}
 
-	const ownerId = "11111111-1111-4111-8111-111111111111";
+	const ownerId = req.user!.id;
 
 	try {
 		const task = await getTaskById(taskId, ownerId);
@@ -167,10 +168,10 @@ app.get('/v1/tasks/:taskId', async (req, res) => {
 	}
 })
 
-app.patch('/v1/tasks/:taskId', async (req, res) => {
+app.patch('/v1/tasks/:taskId', requireAuth, async (req, res) => {
 	const { taskId } = req.params;
 
-	if (!isValidUUID(taskId)) {
+	if (typeof taskId !== "string" || !isValidUUID(taskId)) {
 		res.status(400).json({
 			error: {
 				code: "BAD_REQUEST",
@@ -192,7 +193,7 @@ app.patch('/v1/tasks/:taskId', async (req, res) => {
 		return;
 	}
 
-	const ownerId = "11111111-1111-4111-8111-111111111111";
+	const ownerId = req.user!.id;
 
 	try {
 		const task = await updateTaskStatus(taskId, ownerId, validation.data.status);
@@ -222,10 +223,10 @@ app.patch('/v1/tasks/:taskId', async (req, res) => {
 	}
 })
 
-app.delete('/v1/tasks/:taskId', async (req, res) => {
+app.delete('/v1/tasks/:taskId', requireAuth, async (req, res) => {
 	const { taskId } = req.params;
 
-	if (!isValidUUID(taskId)) {
+	if (typeof taskId !== "string" || !isValidUUID(taskId)) {
 		res.status(400).json({
 			error: {
 				code: "BAD_REQUEST",
@@ -235,7 +236,7 @@ app.delete('/v1/tasks/:taskId', async (req, res) => {
 		return;
 	}
 
-	const ownerId = "11111111-1111-4111-8111-111111111111";
+	const ownerId = req.user!.id;
 
 	try {
 		const deleted = await deleteTask(taskId, ownerId);
