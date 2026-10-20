@@ -2,6 +2,7 @@ import "dotenv/config";
 import express, { type Request, type Response, type NextFunction } from "express";
 import bcrypt from "bcryptjs";
 import { pool } from "./config/database.js";
+import { createAccessToken } from "./features/auth/auth.token.js";
 
 import { getTasks } from "./features/tasks/task.repository.js";
 import { validateGetTasksQuery } from "./features/tasks/task.validation.js";
@@ -19,6 +20,9 @@ import { deleteTask } from "./features/tasks/task.repository.js";
 
 import { createUser } from "./features/auth/auth.repository.js";
 import { validateRegisterBody } from "./features/auth/auth.validation.js";
+
+import { findUserByEmail } from "./features/auth/auth.repository.js";
+import { validateLoginBody } from "./features/auth/login.validation.js";
 
 const app = express();
 
@@ -293,6 +297,72 @@ app.post('/v1/auth/register', async (req, res) => {
 		}
 
 		console.error("Registration failed:", error);
+
+		res.status(500).json({
+			error: {
+				code: "INTERNAL_SERVER_ERROR",
+				message: "An unexpected error occurred.",
+			},
+		});
+	}
+})
+
+app.post('/v1/auth/login', async (req, res) => {
+	const validation = validateLoginBody(req);
+
+	if (!validation.success) {
+		res.status(422).json({
+			error: {
+				code: "UNPROCESSABLE_ENITY",
+				message: validation.message,
+			},
+		});
+		return;
+	}
+
+	try {
+		const { email, password } = validation.data;
+
+		const user = await findUserByEmail(email);
+
+		if (!user) {
+			res.status(401).json({
+				error: {
+					code: "UNAUTHORIZED",
+					message: "Invalid username or password.",
+				},
+			});
+			return;
+		}
+
+		const passwordMatches = await bcrypt.compare(password, user.passwordHash);
+
+		if (!passwordMatches) {
+			res.status(401).json({
+				error: {
+					code: "UNAUTHORIZED",
+					message: "Invalid username or password.",
+				},
+			});
+			return;
+		}
+
+		const accessToken = createAccessToken(user.id);
+
+		res.status(200).json({
+			data: {
+				accessToken,
+				tokenType: "Bearer",
+				expiresIn: 900,
+				user: {
+					id: user.id,
+					email: user.email,
+					username: user.username,
+				},
+			},
+		});
+	} catch (error) {
+		console.error("Login failed:", error);
 
 		res.status(500).json({
 			error: {
